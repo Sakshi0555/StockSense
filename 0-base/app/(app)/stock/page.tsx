@@ -1,4 +1,4 @@
-import { Alert, Input, PageHeader, Select, Table, Td, btn } from "@/components/ui";
+import { Alert, Input, PageHeader, Select, Table, Td, btn, btnPrimary } from "@/components/ui";
 import { formatQty } from "@/lib/constants";
 import { prisma } from "@/lib/db";
 import { locLabel } from "@/lib/labels";
@@ -51,6 +51,9 @@ export default async function StockPage({
           </Select>
           <button className={btn}>Filter</button>
         </form>
+        <a href="/stock/export" className={btnPrimary} download>
+          ⬇ Export CSV
+        </a>
       </PageHeader>
       <Alert message={error} />
       <Alert message={success} tone="success" />
