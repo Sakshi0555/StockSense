@@ -1,0 +1,139 @@
+// StockSense data model
+// Status and type fields are plain strings (SQLite has no enums):
+//   Operation.type   : RECEIPT | DELIVERY | INTERNAL | ADJUSTMENT
+//   Operation.status : DRAFT | WAITING | READY | DONE | CANCELED
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id         Int         @id @default(autoincrement())
+  loginId    String      @unique
+  email      String      @unique
+  password   String
+  name       String?
+  role       String      @default("STAFF") // MANAGER | STAFF
+  otp        String?
+  otpExpiry  DateTime?
+  createdAt  DateTime    @default(now())
+  operations Operation[]
+}
+
+model Warehouse {
+  id        Int        @id @default(autoincrement())
+  name      String
+  shortCode String     @unique
+  address   String?
+  locations Location[]
+}
+
+model Location {
+  id          Int          @id @default(autoincrement())
+  name        String
+  shortCode   String
+  warehouseId Int
+  warehouse   Warehouse    @relation(fields: [warehouseId], references: [id])
+  quants      StockQuant[]
+  opsFrom     Operation[]  @relation("OpSource")
+  opsTo       Operation[]  @relation("OpDest")
+  movesFrom   StockMove[]  @relation("MoveFrom")
+  movesTo     StockMove[]  @relation("MoveTo")
+
+  @@unique([warehouseId, shortCode])
+}
+
+model Category {
+  id       Int       @id @default(autoincrement())
+  name     String    @unique
+  products Product[]
+}
+
+model Product {
+  id         Int             @id @default(autoincrement())
+  name       String
+  sku        String          @unique
+  uom        String          @default("Units")
+  cost       Float           @default(0)
+  reorderMin Int             @default(0) // low-stock threshold
+  reorderQty Int             @default(0) // suggested quantity to reorder
+  categoryId Int?
+  category   Category?       @relation(fields: [categoryId], references: [id])
+  quants     StockQuant[]
+  lines      OperationLine[]
+  moves      StockMove[]
+  createdAt  DateTime        @default(now())
+}
+
+// Current quantity of a product at a location
+model StockQuant {
+  id         Int      @id @default(autoincrement())
+  productId  Int
+  locationId Int
+  quantity   Float    @default(0)
+  product    Product  @relation(fields: [productId], references: [id])
+  location   Location @relation(fields: [locationId], references: [id])
+
+  @@unique([productId, locationId])
+}
+
+model Operation {
+  id               Int             @id @default(autoincrement())
+  reference        String          @unique
+  type             String
+  status           String          @default("DRAFT")
+  contact          String?
+  address          String?
+  scheduledDate    DateTime        @default(now())
+  sourceLocationId Int?
+  destLocationId   Int?
+  sourceLocation   Location?       @relation("OpSource", fields: [sourceLocationId], references: [id])
+  destLocation     Location?       @relation("OpDest", fields: [destLocationId], references: [id])
+  responsibleId    Int?
+  responsible      User?           @relation(fields: [responsibleId], references: [id])
+  lines            OperationLine[]
+  moves            StockMove[]
+  createdAt        DateTime        @default(now())
+  doneAt           DateTime?
+}
+
+model OperationLine {
+  id          Int       @id @default(autoincrement())
+  operationId Int
+  productId   Int
+  quantity    Float
+  operation   Operation @relation(fields: [operationId], references: [id], onDelete: Cascade)
+  product     Product   @relation(fields: [productId], references: [id])
+}
+
+// Stock ledger: one row per product moved. A null location means outside the
+// company (vendor / customer / inventory loss), described by fromLabel/toLabel.
+model StockMove {
+  id             Int        @id @default(autoincrement())
+  reference      String
+  type           String
+  operationId    Int?
+  operation      Operation? @relation(fields: [operationId], references: [id])
+  productId      Int
+  product        Product    @relation(fields: [productId], references: [id])
+  fromLocationId Int?
+  toLocationId   Int?
+  fromLocation   Location?  @relation("MoveFrom", fields: [fromLocationId], references: [id])
+  toLocation     Location?  @relation("MoveTo", fields: [toLocationId], references: [id])
+  fromLabel      String?
+  toLabel        String?
+  contact        String?
+  quantity       Float
+  date           DateTime   @default(now())
+}
+
+// Per-prefix counters for references like WH/IN/0001
+model Sequence {
+  key   String @id
+  value Int    @default(0)
+}
