@@ -1,0 +1,53 @@
+# StockSense: requirements
+#
+# StockSense is a Node.js (Next.js) project, not a Python project.
+# The packages below are installed automatically from package.json with:
+#     npm install
+# Do NOT run "pip install -r requirements.txt".
+
+# ---------------------------------------------------------------
+# System requirements
+# ---------------------------------------------------------------
+Node.js >= 18.18        (tested on 24.x)  https://nodejs.org
+npm >= 9                (comes with Node.js)
+Git                     https://git-scm.com
+A modern browser        (Chrome, Edge, Firefox)
+Gmail account with an App Password (only for password-reset OTP emails)
+# No database server needed: SQLite runs from a local file (prisma/dev.db)
+
+# ---------------------------------------------------------------
+# Runtime dependencies (package.json "dependencies")
+# ---------------------------------------------------------------
+next==15.5.26               # web framework (App Router, Server Actions)
+react==19.1.0               # UI library
+react-dom==19.1.0           # React for the browser
+@prisma/client==6.19.3      # database client
+prisma==6.19.3              # schema, migrations and seeding
+bcryptjs==3.0.3             # password and OTP hashing
+jose==6.2.12                # JWT login sessions
+nodemailer==10.0.10         # sends OTP emails via SMTP
+
+# ---------------------------------------------------------------
+# Development dependencies (package.json "devDependencies")
+# ---------------------------------------------------------------
+typescript==5.9.3
+tailwindcss==4.3.3
+@tailwindcss/postcss==4.3.3
+tsx==4.23.15                # runs the seed script
+eslint==9.39.5
+eslint-config-next==15.5.26
+@eslint/eslintrc==3.3.7
+@types/node==20.19.43
+@types/react==19.3.0
+@types/react-dom==19.3.0
+@types/bcryptjs==2.4.6
+@types/nodemailer==8.0.2
+
+# ---------------------------------------------------------------
+# Setup
+# ---------------------------------------------------------------
+# cd 0-base
+# npm install
+# copy .env.example .env        (macOS/Linux: cp .env.example .env)
+# npm run db:setup
+# npm run dev                   -> http://localhost:3000
