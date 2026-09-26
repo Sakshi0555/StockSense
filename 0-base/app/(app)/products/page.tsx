@@ -1,9 +1,10 @@
 import Link from "next/link";
-import { Alert, Input, LinkButton, PageHeader, Select, Table, Td, btn } from "@/components/ui";
+import { Alert, Input, LinkButton, PageHeader, Select, Table, Td, btn, btnPrimary } from "@/components/ui";
 import { formatQty } from "@/lib/constants";
 import { prisma } from "@/lib/db";
 import { can, requireUser } from "@/lib/session";
 import { productStockSummary } from "@/lib/stock";
+import { autoReorder } from "./actions";
 
 export default async function ProductsPage({
   searchParams,
@@ -11,12 +12,18 @@ export default async function ProductsPage({
   searchParams: Promise<{ q?: string; category?: string; success?: string; error?: string }>;
 }) {
   const { q = "", category = "", success, error } = await searchParams;
-  const [all, categories, user] = await Promise.all([
+  const [all, categories, user, onOrder] = await Promise.all([
     productStockSummary(),
     prisma.category.findMany({ orderBy: { name: "asc" } }),
     requireUser(),
+    prisma.operationLine.findMany({
+      where: { operation: { type: "RECEIPT", status: { in: ["DRAFT", "WAITING", "READY"] } } },
+      select: { productId: true },
+    }),
   ]);
   const canEdit = can(user, "manageProducts");
+  const onOrderIds = new Set(onOrder.map((l) => l.productId));
+  const toReorder = all.filter((p) => (p.isLow || p.isOut) && p.reorderQty > 0 && !onOrderIds.has(p.id));
 
   const term = q.trim().toLowerCase();
   const products = all.filter(
@@ -32,6 +39,18 @@ export default async function ProductsPage({
       </PageHeader>
       <Alert message={error} />
       <Alert message={success} tone="success" />
+
+      {toReorder.length > 0 && can(user, "manageReceiptsDeliveries") && (
+        <div className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-amber-500/40 bg-amber-500/10 px-4 py-3">
+          <div className="text-sm text-amber-200">
+            <b>{toReorder.length}</b> product{toReorder.length > 1 ? "s are" : " is"} low on stock and not on order:{" "}
+            {toReorder.map((p) => `${p.name} (+${p.reorderQty})`).join(", ")}
+          </div>
+          <form action={autoReorder}>
+            <button className={btnPrimary}>⚡ Auto-reorder</button>
+          </form>
+        </div>
+      )}
 
       <form className="mb-4 flex flex-wrap gap-2">
         <Input name="q" defaultValue={q} placeholder="Search by name or SKU…" className="max-w-xs" />
