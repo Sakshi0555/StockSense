@@ -1,0 +1,35 @@
+# StockSense - Basic Inventory Module
+
+products = {
+    "Steel Rods": 50,
+    "Chairs": 20,
+    "Tables": 10
+}
+
+
+def display_inventory():
+    print("\n--- Current Inventory ---")
+    for product, quantity in products.items():
+        print(f"{product}: {quantity} units")
+
+
+def add_stock(product, quantity):
+    products[product] = products.get(product, 0) + quantity
+    print(f"Added {quantity} units of {product}.")
+
+
+def remove_stock(product, quantity):
+    if products.get(product, 0) >= quantity:
+        products[product] -= quantity
+        print(f"Removed {quantity} units of {product}.")
+    else:
+        print(f"Insufficient stock for {product}.")
+
+
+if __name__ == "__main__":
+    display_inventory()
+
+    add_stock("Steel Rods", 25)
+    remove_stock("Chairs", 5)
+
+    display_inventory()
