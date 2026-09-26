@@ -8,6 +8,13 @@ export async function middleware(req: NextRequest) {
   const isPublic = PUBLIC_PATHS.some((p) => pathname.startsWith(p));
   const session = await verifyToken(req.cookies.get(SESSION_COOKIE)?.value);
 
+  // Stale session (user deleted): drop the cookie instead of bouncing to /dashboard forever.
+  if (pathname === "/login" && req.nextUrl.searchParams.has("expired")) {
+    const res = NextResponse.redirect(new URL("/login", req.url));
+    res.cookies.delete(SESSION_COOKIE);
+    return res;
+  }
+
   if (!session && !isPublic) return NextResponse.redirect(new URL("/login", req.url));
   if (session && isPublic) return NextResponse.redirect(new URL("/dashboard", req.url));
   return NextResponse.next();

@@ -5,7 +5,7 @@ import { STATUS_FLOW, TYPE_LABELS, TYPE_ROUTES, formatDate, formatQty, isLate } 
 import { prisma } from "@/lib/db";
 import { locLabel, opFrom, opTo } from "@/lib/labels";
 import { can, operationPermission, requireUser } from "@/lib/session";
-import { addLine, cancelAction, confirmAction, removeLine, updateOperationHeader, validateAction } from "../actions";
+import { addLine, addLineBySku, cancelAction, confirmAction, removeLine, updateOperationHeader, validateAction } from "../actions";
 
 export default async function OperationPage({
   params,
@@ -146,6 +146,28 @@ export default async function OperationPage({
       </Card>
 
       <h3 className="mb-2 text-sm font-semibold text-rose-300">Products</h3>
+      {editable && (
+        <form
+          action={addLineBySku}
+          className="mb-3 flex flex-wrap items-end gap-2 rounded-lg border border-dashed border-rose-400/40 bg-rose-500/5 p-3"
+        >
+          <input type="hidden" name="operationId" value={op.id} />
+          <div className="min-w-[240px] flex-1">
+            <Field label="Scan barcode or type SKU + Enter">
+              <Input name="sku" autoFocus autoComplete="off" placeholder="e.g. DESK001" className="font-mono uppercase" />
+            </Field>
+          </div>
+          <div className="w-24">
+            <Field label="Qty">
+              <Input name="quantity" type="number" min="0.01" step="any" defaultValue={1} />
+            </Field>
+          </div>
+          <button className={btnPrimary}>Add</button>
+          <p className="w-full text-xs text-zinc-500">
+            Works with USB and Bluetooth barcode scanners. Scanning the same product again increases its quantity.
+          </p>
+        </form>
+      )}
       <Table head={outgoing ? ["Product", "Quantity", "Available", ""] : ["Product", "Quantity", ""]} empty={op.lines.length === 0}>
         {op.lines.map((l) => {
           const short = isShort(l.productId, l.quantity);

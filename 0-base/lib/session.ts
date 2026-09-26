@@ -60,6 +60,8 @@ export async function getCurrentUser() {
 
 export async function requireUser() {
   const user = await getCurrentUser();
-  if (!user) redirect("/login");
+  // A valid token for a user that no longer exists (e.g. after reseeding):
+  // send them to /login?expired=1 so middleware clears the stale cookie.
+  if (!user) redirect("/login?expired=1");
   return user;
 }

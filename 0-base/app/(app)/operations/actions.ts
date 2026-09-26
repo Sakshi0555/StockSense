@@ -94,6 +94,30 @@ export async function addLine(formData: FormData) {
   redirectWith(opPath(operationId), {});
 }
 
+// Barcode scanners type the SKU and press Enter, so this is also the "scan" handler.
+// Scanning the same product again increases the quantity instead of adding a new line.
+export async function addLineBySku(formData: FormData) {
+  const operationId = Number(formData.get("operationId"));
+  const sku = String(formData.get("sku") ?? "").trim().toUpperCase();
+  const quantity = Number(formData.get("quantity")) || 1;
+  const op = await authorizeOperation(operationId);
+  if (!["DRAFT", "WAITING"].includes(op.status)) redirectWith(opPath(operationId), { error: "Products can only be changed before the operation is ready." });
+  if (!sku) redirectWith(opPath(operationId), { error: "Scan a barcode or type a SKU." });
+  if (!(quantity > 0)) redirectWith(opPath(operationId), { error: "Quantity must be above 0." });
+
+  const product = await prisma.product.findUnique({ where: { sku } });
+  if (!product) redirectWith(opPath(operationId), { error: `No product found with SKU "${sku}".` });
+
+  const existing = await prisma.operationLine.findFirst({ where: { operationId, productId: product.id } });
+  if (existing) {
+    await prisma.operationLine.update({ where: { id: existing.id }, data: { quantity: { increment: quantity } } });
+  } else {
+    await prisma.operationLine.create({ data: { operationId, productId: product.id, quantity } });
+  }
+  revalidatePath(opPath(operationId));
+  redirectWith(opPath(operationId), { success: `Scanned: +${quantity} ${product.uom} ${product.name}` });
+}
+
 export async function removeLine(formData: FormData) {
   const id = Number(formData.get("lineId"));
   const line = await prisma.operationLine.findUniqueOrThrow({ where: { id }, include: { operation: true } });
