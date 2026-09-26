@@ -1,4 +1,5 @@
 import { notFound } from "next/navigation";
+import { Barcode } from "@/components/Barcode";
 import { PrintButton } from "@/components/PrintButton";
 import { TYPE_LABELS, formatDate, formatQty } from "@/lib/constants";
 import { prisma } from "@/lib/db";
@@ -29,7 +30,11 @@ export default async function PrintPage({ params }: { params: Promise<{ id: stri
           </div>
           <PrintButton />
         </div>
-        <h1 className="mb-6 font-mono text-3xl">{op.reference}</h1>
+        <div className="mb-6 flex items-end justify-between gap-4">
+          <h1 className="font-mono text-3xl">{op.reference}</h1>
+          {/* Scan this into any list's search box to open the record */}
+          <Barcode value={op.reference} />
+        </div>
         <div className="mb-8 grid grid-cols-2 gap-4 text-sm">
           <div><b>From:</b> {opFrom(op)}</div>
           <div><b>To:</b> {opTo(op)}</div>
@@ -37,6 +42,11 @@ export default async function PrintPage({ params }: { params: Promise<{ id: stri
           <div><b>Status:</b> {op.status}</div>
           {op.doneAt && <div><b>Done on:</b> {formatDate(op.doneAt)}</div>}
           <div><b>Responsible:</b> {op.responsible?.name || op.responsible?.loginId}</div>
+          {op.contact && (
+            <div>
+              <b>{op.type === "RECEIPT" ? "Vendor" : op.type === "DELIVERY" ? "Customer" : "Contact"}:</b> {op.contact}
+            </div>
+          )}
           {op.address && <div className="col-span-2"><b>Address:</b> {op.address}</div>}
         </div>
         <table className="w-full border-collapse text-sm">
