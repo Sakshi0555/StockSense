@@ -5,6 +5,7 @@ import { OP_STATUSES, OP_TYPES, TYPE_LABELS, formatDate, formatQty, isLate } fro
 import { prisma } from "@/lib/db";
 import { opFrom, opTo } from "@/lib/labels";
 import { productStockSummary } from "@/lib/stock";
+import { CategoryValueChart, InOutChart, type DayFlow } from "./Charts";
 
 type Filters = { type?: string; status?: string; warehouse?: string; category?: string; error?: string };
 
@@ -24,7 +25,11 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
     ...(category && { lines: { some: { product: { categoryId: Number(category) } } } }),
   };
 
-  const [stock, openOps, filtered, warehouses, categories] = await Promise.all([
+  const weekStart = new Date();
+  weekStart.setHours(0, 0, 0, 0);
+  weekStart.setDate(weekStart.getDate() - 6);
+
+  const [stock, openOps, filtered, warehouses, categories, weekMoves] = await Promise.all([
     productStockSummary(),
     prisma.operation.findMany({ where: open, select: { type: true, status: true, scheduledDate: true } }),
     prisma.operation.findMany({
@@ -35,7 +40,32 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
     }),
     prisma.warehouse.findMany({ orderBy: { name: "asc" } }),
     prisma.category.findMany({ orderBy: { name: "asc" } }),
+    prisma.stockMove.findMany({
+      where: { date: { gte: weekStart } },
+      select: { date: true, quantity: true, fromLocationId: true, toLocationId: true },
+    }),
   ]);
+
+  // Last 7 days of stock entering (no source location) and leaving (no destination) the company.
+  const days: DayFlow[] = Array.from({ length: 7 }, (_, i) => {
+    const day = new Date(weekStart);
+    day.setDate(weekStart.getDate() + i);
+    const next = new Date(day);
+    next.setDate(day.getDate() + 1);
+    const moves = weekMoves.filter((m) => m.date >= day && m.date < next);
+    return {
+      label: i === 6 ? "Today" : day.toLocaleDateString("en-IN", { weekday: "short" }),
+      in: moves.filter((m) => !m.fromLocationId).reduce((s, m) => s + m.quantity, 0),
+      out: moves.filter((m) => !m.toLocationId).reduce((s, m) => s + m.quantity, 0),
+    };
+  });
+
+  const valueByCategory = new Map<string, number>();
+  for (const p of stock) {
+    const name = p.category?.name ?? "Uncategorized";
+    valueByCategory.set(name, (valueByCategory.get(name) ?? 0) + Math.max(0, p.onHand) * p.cost);
+  }
+  const categoryRows = [...valueByCategory].map(([name, value]) => ({ name, value })).sort((a, b) => b.value - a.value);
 
   const inStock = stock.filter((p) => p.onHand > 0).length;
   const lowOrOut = stock.filter((p) => p.isLow || p.isOut);
@@ -77,6 +107,17 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
       <div className="mb-6 grid gap-4 md:grid-cols-2">
         <OpCard title="Receipt" href="/operations/receipts?status=READY" action={`${receipts.toProcess} to receive`} stats={receipts} />
         <OpCard title="Delivery" href="/operations/deliveries?status=READY" action={`${deliveries.toProcess} to deliver`} stats={deliveries} />
+      </div>
+
+      <div className="mb-6 grid gap-4 lg:grid-cols-[3fr_2fr]">
+        <Card>
+          <h2 className="mb-3 text-sm font-semibold text-rose-300">Stock movement · last 7 days</h2>
+          <InOutChart days={days} />
+        </Card>
+        <Card>
+          <h2 className="mb-3 text-sm font-semibold text-rose-300">Inventory value by category</h2>
+          <CategoryValueChart rows={categoryRows} />
+        </Card>
       </div>
 
       {lowOrOut.length > 0 && (
